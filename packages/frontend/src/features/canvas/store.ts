@@ -81,6 +81,26 @@ function getAgentFromNode(nodes: AgentFlowNode[], agentId: string): Agent | null
 	return (node.data as { agent: Agent }).agent;
 }
 
+// Helper: create a styled edge
+function makeEdge(
+	id: string,
+	source: string,
+	target: string,
+	color: string,
+	sourceHandle?: string,
+): AgentFlowEdge {
+	return {
+		id,
+		source,
+		target,
+		type: "smoothstep",
+		selectable: false,
+		deletable: false,
+		style: { stroke: color, strokeWidth: 2 },
+		...(sourceHandle && { sourceHandle }),
+	};
+}
+
 // Helper: persist agent to backend (fire-and-forget)
 function syncAgent(nodes: AgentFlowNode[], agentId: string) {
 	const agent = getAgentFromNode(nodes, agentId);
@@ -106,16 +126,12 @@ function buildGroupNodesForAgent(
 			id: gId,
 			type: "group",
 			position: pos,
+			draggable: false,
+			connectable: false,
 			data: { label: GROUP_LABELS[kind], agentId, kind },
 		} as AgentFlowNode);
 
-		gEdges.push({
-			id: `${agentId}-${gId}`,
-			source: agentId,
-			target: gId,
-			sourceHandle: kind,
-			style: { stroke: GROUP_KIND_COLORS[kind], strokeWidth: 2 },
-		});
+		gEdges.push(makeEdge(`${agentId}-${gId}`, agentId, gId, GROUP_KIND_COLORS[kind], kind));
 	}
 
 	return { nodes: gNodes, edges: gEdges };
@@ -159,15 +175,14 @@ export const useFlowStore = create<FlowState>((set, get) => {
 			id: nodeId,
 			type: childType,
 			position,
+			draggable: false,
+			connectable: false,
 			data: nodeData,
 			hidden: isCollapsed,
 		} as AgentFlowNode;
 
 		const newEdge: AgentFlowEdge = {
-			id: `${gId}-${nodeId}`,
-			source: gId,
-			target: nodeId,
-			style: { stroke: GROUP_KIND_COLORS[kind], strokeWidth: 2 },
+			...makeEdge(`${gId}-${nodeId}`, gId, nodeId, GROUP_KIND_COLORS[kind]),
 			hidden: isCollapsed,
 		};
 
@@ -325,14 +340,13 @@ export const useFlowStore = create<FlowState>((set, get) => {
 						id: nodeId,
 						type: "tool",
 						position: pos,
+						draggable: false,
+						connectable: false,
 						data: { label: tool.name, tool, agentId: agent.id },
 					} as AgentFlowNode);
-					allEdges.push({
-						id: `${toolsGroupId}-${nodeId}`,
-						source: toolsGroupId,
-						target: nodeId,
-						style: { stroke: GROUP_KIND_COLORS.tools, strokeWidth: 2 },
-					});
+					allEdges.push(
+						makeEdge(`${toolsGroupId}-${nodeId}`, toolsGroupId, nodeId, GROUP_KIND_COLORS.tools),
+					);
 				}
 
 				// Child nodes for skills
@@ -347,14 +361,13 @@ export const useFlowStore = create<FlowState>((set, get) => {
 						id: nodeId,
 						type: "skill",
 						position: pos,
+						draggable: false,
+						connectable: false,
 						data: { label: skill.name, skill, agentId: agent.id },
 					} as AgentFlowNode);
-					allEdges.push({
-						id: `${skillsGroupId}-${nodeId}`,
-						source: skillsGroupId,
-						target: nodeId,
-						style: { stroke: GROUP_KIND_COLORS.skills, strokeWidth: 2 },
-					});
+					allEdges.push(
+						makeEdge(`${skillsGroupId}-${nodeId}`, skillsGroupId, nodeId, GROUP_KIND_COLORS.skills),
+					);
 				}
 
 				// Child nodes for channels
@@ -370,22 +383,42 @@ export const useFlowStore = create<FlowState>((set, get) => {
 						id: nodeId,
 						type: "channel",
 						position: pos,
+						draggable: false,
+						connectable: false,
 						data: { label: channel.name, channel, agentId: agent.id },
 					} as AgentFlowNode);
-					allEdges.push({
-						id: `${channelsGroupId}-${nodeId}`,
-						source: channelsGroupId,
-						target: nodeId,
-						style: { stroke: GROUP_KIND_COLORS.channels, strokeWidth: 2 },
-					});
+					allEdges.push(
+						makeEdge(
+							`${channelsGroupId}-${nodeId}`,
+							channelsGroupId,
+							nodeId,
+							GROUP_KIND_COLORS.channels,
+						),
+					);
 				}
 			}
 
 			set({ nodes: allNodes, edges: allEdges });
+
+			// Auto-layout if no saved positions
+			if (!layout?.positions || Object.keys(layout.positions).length === 0) {
+				get().autoLayout();
+			}
 			persistLayout();
 		},
 
-		addAgent: async (position = { x: 250, y: 200 }) => {
+		addAgent: async (position?: { x: number; y: number }) => {
+			// Calculate non-overlapping position if not specified
+			if (!position) {
+				const { nodes } = get();
+				const agentNodes = nodes.filter((n) => n.type === "agent");
+				if (agentNodes.length === 0) {
+					position = { x: 250, y: 200 };
+				} else {
+					const maxY = Math.max(...agentNodes.map((n) => n.position.y));
+					position = { x: 250, y: maxY + 500 };
+				}
+			}
 			const draft = createDefaultAgent();
 			const channel = createDefaultChannel();
 			draft.channels = [channel];
@@ -415,14 +448,16 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				id: chNodeId,
 				type: "channel",
 				position: chPos,
+				draggable: false,
+				connectable: false,
 				data: { label: agent.channels[0].name, channel: agent.channels[0], agentId: agent.id },
 			} as AgentFlowNode;
-			const chEdge: AgentFlowEdge = {
-				id: `${channelsGroupId}-${chNodeId}`,
-				source: channelsGroupId,
-				target: chNodeId,
-				style: { stroke: GROUP_KIND_COLORS.channels, strokeWidth: 2 },
-			};
+			const chEdge = makeEdge(
+				`${channelsGroupId}-${chNodeId}`,
+				channelsGroupId,
+				chNodeId,
+				GROUP_KIND_COLORS.channels,
+			);
 
 			set({
 				nodes: [...currentNodes, agentNode, ...groups.nodes, chNode],
