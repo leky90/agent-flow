@@ -22,7 +22,6 @@ import { ThemeToggle } from "./shared/ui/ThemeToggle";
 
 const PANEL_TITLES: Record<string, string> = {
 	agent: "Edit Agent",
-	group: "Group",
 	tool: "Edit Tool",
 	skill: "Edit Skill",
 	channel: "Edit Channel",
@@ -78,7 +77,7 @@ function AppContent() {
 
 	const panelTitle =
 		panelType === "group" && selectedNode
-			? `${(selectedNode.data as GroupNodeData).label}`
+			? (selectedNode.data as GroupNodeData).label
 			: (PANEL_TITLES[panelType ?? ""] ?? "");
 
 	return (

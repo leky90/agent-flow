@@ -1,4 +1,3 @@
-import { generateId } from "@agent-flow/shared";
 import {
 	applyEdgeChanges,
 	applyNodeChanges,
@@ -156,6 +155,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
 	const addChildNode = (
 		agentId: string,
 		childType: "tool" | "skill" | "channel",
+		itemId: string,
 		nodeData: AgentFlowNode["data"],
 	): string => {
 		const { nodes, edges, collapsedGroups } = get();
@@ -173,7 +173,8 @@ export const useFlowStore = create<FlowState>((set, get) => {
 			childCount + 1,
 		);
 
-		const nodeId = generateId();
+		// Use consistent ID format matching loadFromApi: "type-itemId"
+		const nodeId = `${childType}-${itemId}`;
 		const isCollapsed = collapsedGroups[agentId]?.[kind] ?? false;
 
 		const newNode: AgentFlowNode = {
@@ -252,9 +253,13 @@ export const useFlowStore = create<FlowState>((set, get) => {
 		onNodesChange: (changes) => {
 			const { nodes, edges } = get();
 
-			// Detect agent node position changes and move descendants together
+			// Only process position changes for agent drag-along behavior
+			const positionChanges = changes.filter((c) => c.type === "position" && c.position);
+
 			const agentDelta = new Map<string, { dx: number; dy: number }>();
-			for (const change of changes) {
+			let hasDragEnd = false;
+
+			for (const change of positionChanges) {
 				if (change.type === "position" && change.position) {
 					const node = nodes.find((n) => n.id === change.id);
 					if (node?.type === "agent") {
@@ -263,6 +268,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
 							dy: change.position.y - node.position.y,
 						});
 					}
+					if (!change.dragging) hasDragEnd = true;
 				}
 			}
 
@@ -270,7 +276,6 @@ export const useFlowStore = create<FlowState>((set, get) => {
 
 			// Move group nodes + child nodes along with their agent
 			if (agentDelta.size > 0) {
-				// Build map: agentId → set of descendant node IDs (groups + children)
 				const descendants = new Map<string, Set<string>>();
 				for (const [agentId] of agentDelta) {
 					const groupIds = GROUP_KINDS.map((k) => groupNodeId(agentId, k));
@@ -295,7 +300,11 @@ export const useFlowStore = create<FlowState>((set, get) => {
 			}
 
 			set({ nodes: updated });
-			persistLayout();
+
+			// Only persist on drag end or non-drag changes, not every frame
+			if (hasDragEnd || positionChanges.length === 0) {
+				persistLayout();
+			}
 		},
 
 		onEdgesChange: (changes) => {
@@ -526,7 +535,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				tools: [...(getAgentFromNode(get().nodes, agentId)?.tools ?? []), tool],
 			});
 
-			const nodeId = addChildNode(agentId, "tool", {
+			const nodeId = addChildNode(agentId, "tool", tool.id, {
 				label: tool.name,
 				tool,
 				agentId,
@@ -607,7 +616,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				skills: [...(getAgentFromNode(get().nodes, agentId)?.skills ?? []), skill],
 			});
 
-			const nodeId = addChildNode(agentId, "skill", {
+			const nodeId = addChildNode(agentId, "skill", skill.id, {
 				label: skill.name,
 				skill,
 				agentId,
@@ -688,7 +697,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				channels: [...(getAgentFromNode(get().nodes, agentId)?.channels ?? []), channel],
 			});
 
-			const nodeId = addChildNode(agentId, "channel", {
+			const nodeId = addChildNode(agentId, "channel", channel.id, {
 				label: channel.name,
 				channel,
 				agentId,

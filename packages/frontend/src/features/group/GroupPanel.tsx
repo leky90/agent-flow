@@ -12,25 +12,25 @@ interface GroupPanelProps {
 }
 
 export function GroupPanel({ agentId, kind }: GroupPanelProps) {
-	const nodes = useFlowStore((s) => s.nodes);
-	const agent = nodes.find((n) => n.id === agentId && n.type === "agent");
-	if (!agent) return null;
+	const agent = useFlowStore((s) => {
+		const node = s.nodes.find((n) => n.id === agentId && n.type === "agent");
+		return node ? (node.data as { agent: Agent }).agent : null;
+	});
 
-	const agentData = (agent.data as { agent: Agent }).agent;
+	if (!agent) return null;
 
 	switch (kind) {
 		case "tools":
-			return <ToolsList agentId={agentId} agent={agentData} />;
+			return <ToolsList agentId={agentId} agent={agent} />;
 		case "skills":
-			return <SkillsList agentId={agentId} agent={agentData} />;
+			return <SkillsList agentId={agentId} agent={agent} />;
 		case "channels":
-			return <ChannelsList agentId={agentId} agent={agentData} />;
+			return <ChannelsList agentId={agentId} agent={agent} />;
 	}
 }
 
 function ToolsList({ agentId, agent }: { agentId: string; agent: Agent }) {
-	const { addTool, deleteTool, setSelectedNode } = useFlowStore();
-	const nodes = useFlowStore((s) => s.nodes);
+	const store = useFlowStore;
 
 	return (
 		<ScrollArea className="h-full">
@@ -38,35 +38,35 @@ function ToolsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 				{agent.tools.length === 0 && (
 					<p className="text-xs text-muted-foreground">No tools added yet.</p>
 				)}
-				{agent.tools.map((tool) => {
-					const toolNode = nodes.find((n) => n.type === "tool" && n.data.tool.id === tool.id);
-					return (
-						<div
-							key={tool.id}
-							className="group flex items-center justify-between rounded-md border border-border px-3 py-2"
+				{agent.tools.map((tool) => (
+					<div
+						key={tool.id}
+						className="group flex items-center justify-between rounded-md border border-border px-3 py-2"
+					>
+						<button
+							type="button"
+							className="flex items-center gap-2 text-left text-sm hover:text-foreground"
+							onClick={() => {
+								const node = store
+									.getState()
+									.nodes.find((n) => n.type === "tool" && n.data.tool.id === tool.id);
+								if (node) store.getState().setSelectedNode(node.id, "tool");
+							}}
 						>
-							<button
-								type="button"
-								className="flex items-center gap-2 text-left text-sm hover:text-foreground"
-								onClick={() => {
-									if (toolNode) setSelectedNode(toolNode.id, "tool");
-								}}
-							>
-								<Wrench size={14} className="text-accent-2" />
-								{tool.name}
-							</button>
-							<Button
-								variant="ghost-destructive"
-								size="icon-xs"
-								aria-label={`Remove ${tool.name}`}
-								className="hidden group-hover:flex"
-								onClick={() => deleteTool(agentId, tool.id)}
-							>
-								<Trash2 size={12} />
-							</Button>
-						</div>
-					);
-				})}
+							<Wrench size={14} className="text-accent-2" />
+							{tool.name}
+						</button>
+						<Button
+							variant="ghost-destructive"
+							size="icon-xs"
+							aria-label={`Remove ${tool.name}`}
+							className="hidden group-hover:flex"
+							onClick={() => store.getState().deleteTool(agentId, tool.id)}
+						>
+							<Trash2 size={12} />
+						</Button>
+					</div>
+				))}
 
 				<Separator />
 
@@ -74,7 +74,7 @@ function ToolsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 					variant="outline"
 					size="sm"
 					className="w-full justify-start"
-					onClick={() => addTool(agentId)}
+					onClick={() => store.getState().addTool(agentId)}
 				>
 					<Plus size={14} />
 					Add Tool
@@ -85,8 +85,7 @@ function ToolsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 }
 
 function SkillsList({ agentId, agent }: { agentId: string; agent: Agent }) {
-	const { addSkill, deleteSkill, setSelectedNode } = useFlowStore();
-	const nodes = useFlowStore((s) => s.nodes);
+	const store = useFlowStore;
 
 	return (
 		<ScrollArea className="h-full">
@@ -94,35 +93,35 @@ function SkillsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 				{agent.skills.length === 0 && (
 					<p className="text-xs text-muted-foreground">No skills added yet.</p>
 				)}
-				{agent.skills.map((skill) => {
-					const skillNode = nodes.find((n) => n.type === "skill" && n.data.skill.id === skill.id);
-					return (
-						<div
-							key={skill.id}
-							className="group flex items-center justify-between rounded-md border border-border px-3 py-2"
+				{agent.skills.map((skill) => (
+					<div
+						key={skill.id}
+						className="group flex items-center justify-between rounded-md border border-border px-3 py-2"
+					>
+						<button
+							type="button"
+							className="flex items-center gap-2 text-left text-sm hover:text-foreground"
+							onClick={() => {
+								const node = store
+									.getState()
+									.nodes.find((n) => n.type === "skill" && n.data.skill.id === skill.id);
+								if (node) store.getState().setSelectedNode(node.id, "skill");
+							}}
 						>
-							<button
-								type="button"
-								className="flex items-center gap-2 text-left text-sm hover:text-foreground"
-								onClick={() => {
-									if (skillNode) setSelectedNode(skillNode.id, "skill");
-								}}
-							>
-								<Zap size={14} className="text-accent-3" />
-								{skill.name}
-							</button>
-							<Button
-								variant="ghost-destructive"
-								size="icon-xs"
-								aria-label={`Delete ${skill.name}`}
-								className="hidden group-hover:flex"
-								onClick={() => deleteSkill(agentId, skill.id)}
-							>
-								<Trash2 size={12} />
-							</Button>
-						</div>
-					);
-				})}
+							<Zap size={14} className="text-accent-3" />
+							{skill.name}
+						</button>
+						<Button
+							variant="ghost-destructive"
+							size="icon-xs"
+							aria-label={`Delete ${skill.name}`}
+							className="hidden group-hover:flex"
+							onClick={() => store.getState().deleteSkill(agentId, skill.id)}
+						>
+							<Trash2 size={12} />
+						</Button>
+					</div>
+				))}
 
 				<Separator />
 
@@ -130,7 +129,7 @@ function SkillsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 					variant="outline"
 					size="sm"
 					className="w-full justify-start"
-					onClick={() => addSkill(agentId)}
+					onClick={() => store.getState().addSkill(agentId)}
 				>
 					<Plus size={14} />
 					Add Skill
@@ -141,8 +140,7 @@ function SkillsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 }
 
 function ChannelsList({ agentId, agent }: { agentId: string; agent: Agent }) {
-	const { addChannel, deleteChannel, setSelectedNode } = useFlowStore();
-	const nodes = useFlowStore((s) => s.nodes);
+	const store = useFlowStore;
 
 	return (
 		<ScrollArea className="h-full">
@@ -150,37 +148,35 @@ function ChannelsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 				{agent.channels.length === 0 && (
 					<p className="text-xs text-muted-foreground">No channels added yet.</p>
 				)}
-				{agent.channels.map((channel) => {
-					const channelNode = nodes.find(
-						(n) => n.type === "channel" && n.data.channel.id === channel.id,
-					);
-					return (
-						<div
-							key={channel.id}
-							className="group flex items-center justify-between rounded-md border border-border px-3 py-2"
+				{agent.channels.map((channel) => (
+					<div
+						key={channel.id}
+						className="group flex items-center justify-between rounded-md border border-border px-3 py-2"
+					>
+						<button
+							type="button"
+							className="flex items-center gap-2 text-left text-sm hover:text-foreground"
+							onClick={() => {
+								const node = store
+									.getState()
+									.nodes.find((n) => n.type === "channel" && n.data.channel.id === channel.id);
+								if (node) store.getState().setSelectedNode(node.id, "channel");
+							}}
 						>
-							<button
-								type="button"
-								className="flex items-center gap-2 text-left text-sm hover:text-foreground"
-								onClick={() => {
-									if (channelNode) setSelectedNode(channelNode.id, "channel");
-								}}
-							>
-								<MessageSquare size={14} className="text-accent-4" />
-								{channel.name}
-							</button>
-							<Button
-								variant="ghost-destructive"
-								size="icon-xs"
-								aria-label={`Remove ${channel.name}`}
-								className="hidden group-hover:flex"
-								onClick={() => deleteChannel(agentId, channel.id)}
-							>
-								<Trash2 size={12} />
-							</Button>
-						</div>
-					);
-				})}
+							<MessageSquare size={14} className="text-accent-4" />
+							{channel.name}
+						</button>
+						<Button
+							variant="ghost-destructive"
+							size="icon-xs"
+							aria-label={`Remove ${channel.name}`}
+							className="hidden group-hover:flex"
+							onClick={() => store.getState().deleteChannel(agentId, channel.id)}
+						>
+							<Trash2 size={12} />
+						</Button>
+					</div>
+				))}
 
 				<Separator />
 
@@ -188,7 +184,7 @@ function ChannelsList({ agentId, agent }: { agentId: string; agent: Agent }) {
 					variant="outline"
 					size="sm"
 					className="w-full justify-start"
-					onClick={() => addChannel(agentId)}
+					onClick={() => store.getState().addChannel(agentId)}
 				>
 					<Plus size={14} />
 					Add Channel
