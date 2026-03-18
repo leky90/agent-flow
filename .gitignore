@@ -37,6 +37,7 @@ playwright-report/
 
 # Build artifacts
 *.tsbuildinfo
+storybook-static/
 
 # Temporary screenshots (audit, debug)
 .screenshots/

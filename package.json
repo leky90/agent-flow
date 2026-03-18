@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "lint": "biome check .",
     "lint:fix": "biome check --fix .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "storybook": "pnpm --filter @agent-flow/frontend storybook"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.4.8",
