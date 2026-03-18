@@ -1,12 +1,13 @@
 import { ReactFlowProvider } from "@xyflow/react";
 import { Bot, HelpCircle, LayoutGrid, Plus, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentPanel } from "./features/agent/AgentPanel";
 import type { Agent } from "./features/agent/types";
 import { Canvas } from "./features/canvas/Canvas";
-import { Sidebar } from "./features/canvas/Sidebar";
 import { useFlowStore } from "./features/canvas/store";
 import type { GroupNodeData } from "./features/canvas/types";
 import { ChannelPanel } from "./features/channel/ChannelPanel";
@@ -17,6 +18,7 @@ import { SkillPanel } from "./features/skill/SkillPanel";
 import type { AgentSkill } from "./features/skill/types";
 import { ToolPanel } from "./features/tool/ToolPanel";
 import type { AgentTool } from "./features/tool/types";
+import { DeleteConfirm } from "./shared/ui/DeleteConfirm";
 import { OnboardingTour, useOnboardingTour } from "./shared/ui/OnboardingTour";
 import { ThemeToggle } from "./shared/ui/ThemeToggle";
 
@@ -27,6 +29,98 @@ const PANEL_TITLES: Record<string, string> = {
 	channel: "Edit Channel",
 };
 
+function AgentListContent({ onClose }: { onClose: () => void }) {
+	const nodes = useFlowStore((s) => s.nodes);
+
+	const agents = nodes
+		.filter((n) => n.type === "agent")
+		.map((n) => ({
+			id: n.id,
+			agent: (n.data as { agent: Agent }).agent,
+			position: n.position,
+		}));
+
+	const [deleteAgentId, setDeleteAgentId] = useState<string | null>(null);
+
+	const handleClickAgent = useCallback(
+		(id: string) => {
+			useFlowStore.getState().setSelectedNode(id, "agent");
+			onClose();
+		},
+		[onClose],
+	);
+
+	return (
+		<>
+			<div className="flex items-center justify-between border-b border-border px-3 pb-2">
+				<h3 className="font-heading text-sm font-semibold tracking-wide">Agents</h3>
+			</div>
+
+			<ScrollArea className="max-h-64">
+				<ul className="list-none">
+					{agents.map(({ id, agent }) => (
+						<li
+							key={id}
+							onClick={() => handleClickAgent(id)}
+							onKeyDown={(e) => {
+								if (e.key === "Enter" || e.key === " ") handleClickAgent(id);
+							}}
+							className="group flex cursor-pointer items-center justify-between rounded-md px-3 py-2 transition-colors hover:bg-accent"
+						>
+							<span className="flex items-center gap-2">
+								<Bot size={14} className="text-primary" />
+								<span className="text-sm">{agent.name}</span>
+							</span>
+							<Button
+								variant="ghost-destructive"
+								size="icon-xs"
+								aria-label={`Delete ${agent.name}`}
+								className="hidden group-hover:flex"
+								onClick={(e) => {
+									e.stopPropagation();
+									setDeleteAgentId(id);
+								}}
+							>
+								<X size={10} />
+							</Button>
+						</li>
+					))}
+				</ul>
+
+				{agents.length === 0 && (
+					<p className="px-3 py-4 text-center text-xs text-muted-foreground">No agents yet.</p>
+				)}
+			</ScrollArea>
+
+			<div className="border-t border-border pt-2">
+				<Button
+					className="w-full"
+					size="sm"
+					onClick={() => {
+						useFlowStore.getState().addAgent();
+						onClose();
+					}}
+				>
+					<Plus size={14} />
+					New Agent
+				</Button>
+			</div>
+
+			{deleteAgentId && (
+				<DeleteConfirm
+					title="Delete Agent?"
+					message="This will delete the agent and all its tools, skills, and channels."
+					onConfirm={() => {
+						useFlowStore.getState().deleteAgent(deleteAgentId);
+						setDeleteAgentId(null);
+					}}
+					onCancel={() => setDeleteAgentId(null)}
+				/>
+			)}
+		</>
+	);
+}
+
 function AppContent() {
 	const { nodes, selectedNodeId, panelType, loadFromApi, closePanel, addAgent, autoLayout } =
 		useFlowStore();
@@ -36,6 +130,12 @@ function AppContent() {
 	useEffect(() => {
 		loadFromApi();
 	}, [loadFromApi]);
+
+	// Close sidebar when panel opens or context menu opens
+	const contextMenu = useFlowStore((s) => s.contextMenu);
+	useEffect(() => {
+		if (panelType || contextMenu) setSidebarOpen(false);
+	}, [panelType, contextMenu]);
 
 	const selectedNode = nodes.find((n) => n.id === selectedNodeId);
 
@@ -97,28 +197,38 @@ function AppContent() {
 			)}
 
 			<ChatThread />
-			<Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />
 
 			<OnboardingTour active={tour.active} onFinish={tour.finish} />
 
 			{/* FAB toolbar — left center */}
 			<div className="fixed left-4 top-1/2 z-50 flex -translate-y-1/2 flex-col gap-2">
-				<Button
-					size="icon"
-					variant={sidebarOpen ? "default" : "outline"}
-					aria-label="Toggle agent list"
-					title="Agent List"
-					onClick={() => setSidebarOpen((v) => !v)}
-				>
-					<Bot size={18} />
-				</Button>
+				<Popover open={sidebarOpen} onOpenChange={setSidebarOpen}>
+					<PopoverTrigger
+						render={
+							<Button
+								size="icon"
+								variant={sidebarOpen ? "default" : "outline"}
+								aria-label="Toggle agent list"
+								title="Agent List"
+							/>
+						}
+					>
+						<Bot size={18} />
+					</PopoverTrigger>
+					<PopoverContent side="right" sideOffset={12} align="start" className="w-64">
+						<AgentListContent onClose={() => setSidebarOpen(false)} />
+					</PopoverContent>
+				</Popover>
 
 				<Button
 					size="icon"
 					variant="outline"
 					aria-label="Add agent"
 					title="Add Agent"
-					onClick={() => addAgent()}
+					onClick={() => {
+						setSidebarOpen(false);
+						addAgent();
+					}}
 				>
 					<Plus size={18} />
 				</Button>
@@ -128,7 +238,10 @@ function AppContent() {
 					variant="outline"
 					aria-label="Auto layout"
 					title="Auto Layout"
-					onClick={() => autoLayout()}
+					onClick={() => {
+						setSidebarOpen(false);
+						autoLayout();
+					}}
 				>
 					<LayoutGrid size={18} />
 				</Button>
@@ -140,7 +253,10 @@ function AppContent() {
 					variant="ghost"
 					aria-label="Show tutorial"
 					title="Tutorial"
-					onClick={tour.start}
+					onClick={() => {
+						setSidebarOpen(false);
+						tour.start();
+					}}
 				>
 					<HelpCircle size={16} />
 				</Button>
