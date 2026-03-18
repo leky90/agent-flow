@@ -1,21 +1,17 @@
 import { Handle, Position } from "@xyflow/react";
-import { Bot, ChevronDown, ChevronRight, MessageSquare, Wrench, Zap } from "lucide-react";
+import { Bot, MessageSquare, Wrench, Zap } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useFlowStore } from "../canvas/store";
 import { NODE_COLORS } from "../canvas/theme";
 import type { AgentNodeData } from "../canvas/types";
 
-const EMPTY_GROUPS: string[] = [];
+const EMPTY_COLLAPSED: Partial<Record<string, boolean>> = {};
 
 export function AgentNode({ data }: { data: AgentNodeData }) {
 	const { agent } = data;
+	const collapsedGroups = useFlowStore((s) => s.collapsedGroups[agent.id] ?? EMPTY_COLLAPSED);
 
-	const collapsedGroups = useFlowStore((s) => s.collapsedGroups[agent.id] ?? EMPTY_GROUPS);
-	const toggleCollapse = useFlowStore((s) => s.toggleCollapse);
-
-	const isToolsCollapsed = collapsedGroups.includes("tools");
-	const isSkillsCollapsed = collapsedGroups.includes("skills");
-	const isChannelsCollapsed = collapsedGroups.includes("channels");
+	const showCounts = collapsedGroups.tools || collapsedGroups.skills || collapsedGroups.channels;
 
 	return (
 		<div className="min-w-64 rounded-sm border border-accent-1-border bg-card">
@@ -34,38 +30,25 @@ export function AgentNode({ data }: { data: AgentNodeData }) {
 					<Badge variant="outline">{agent.toolExecution}</Badge>
 				</div>
 
-				<div className="flex gap-3 border-t border-border pt-2.5 text-xs text-muted-foreground">
-					<button
-						className="flex items-center gap-0.5 hover:text-foreground"
-						onClick={(e) => {
-							e.stopPropagation();
-							toggleCollapse(agent.id, "tools");
-						}}
-					>
-						{isToolsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-						<Wrench size={12} /> {agent.tools.length}
-					</button>
-					<button
-						className="flex items-center gap-0.5 hover:text-foreground"
-						onClick={(e) => {
-							e.stopPropagation();
-							toggleCollapse(agent.id, "skills");
-						}}
-					>
-						{isSkillsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-						<Zap size={12} /> {agent.skills.length}
-					</button>
-					<button
-						className="flex items-center gap-0.5 hover:text-foreground"
-						onClick={(e) => {
-							e.stopPropagation();
-							toggleCollapse(agent.id, "channels");
-						}}
-					>
-						{isChannelsCollapsed ? <ChevronRight size={12} /> : <ChevronDown size={12} />}
-						<MessageSquare size={12} /> {agent.channels.length}
-					</button>
-				</div>
+				{showCounts && (
+					<div className="flex gap-3 border-t border-border pt-2.5 text-xs text-muted-foreground">
+						{collapsedGroups.tools && (
+							<span className="flex items-center gap-1">
+								<Wrench size={12} /> {agent.tools.length}
+							</span>
+						)}
+						{collapsedGroups.skills && (
+							<span className="flex items-center gap-1">
+								<Zap size={12} /> {agent.skills.length}
+							</span>
+						)}
+						{collapsedGroups.channels && (
+							<span className="flex items-center gap-1">
+								<MessageSquare size={12} /> {agent.channels.length}
+							</span>
+						)}
+					</div>
+				)}
 			</div>
 
 			<Handle

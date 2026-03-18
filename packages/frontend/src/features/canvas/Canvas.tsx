@@ -2,7 +2,6 @@ import {
 	Background,
 	BackgroundVariant,
 	Controls,
-	MiniMap,
 	type NodeMouseHandler,
 	ReactFlow,
 } from "@xyflow/react";
@@ -11,8 +10,9 @@ import { DeleteConfirm } from "../../shared/ui/DeleteConfirm";
 import { ContextMenu } from "./ContextMenu";
 import { nodeTypes } from "./nodeTypes";
 import { useFlowStore } from "./store";
-import { NODE_COLORS } from "./theme";
 import type { AgentFlowNode } from "./types";
+
+type NodeType = "agent" | "group" | "tool" | "skill" | "channel";
 
 export function Canvas() {
 	const {
@@ -34,7 +34,7 @@ export function Canvas() {
 
 	const onNodeClick: NodeMouseHandler<AgentFlowNode> = useCallback(
 		(_event, node) => {
-			const type = node.type as "agent" | "tool" | "skill" | "channel";
+			const type = node.type as NodeType;
 			setSelectedNode(node.id, type);
 		},
 		[setSelectedNode],
@@ -48,7 +48,7 @@ export function Canvas() {
 	const onNodeContextMenu: NodeMouseHandler<AgentFlowNode> = useCallback(
 		(event, node) => {
 			event.preventDefault();
-			const type = node.type as "agent" | "tool" | "skill" | "channel";
+			const type = node.type as NodeType;
 			openContextMenu(event.clientX, event.clientY, node.id, type);
 		},
 		[openContextMenu],
@@ -68,7 +68,7 @@ export function Canvas() {
 				const { selectedNodeId } = useFlowStore.getState();
 				if (!selectedNodeId) return;
 				const node = nodes.find((n) => n.id === selectedNodeId);
-				if (node) setDeleteTarget(node as AgentFlowNode);
+				if (node && node.type !== "group") setDeleteTarget(node as AgentFlowNode);
 			}
 		},
 		[nodes],
@@ -113,22 +113,6 @@ export function Canvas() {
 					color="rgba(165,32,32,0.15)"
 				/>
 				<Controls />
-				<MiniMap
-					nodeColor={(node) => {
-						switch (node.type) {
-							case "agent":
-								return NODE_COLORS.agent;
-							case "tool":
-								return NODE_COLORS.tool;
-							case "skill":
-								return NODE_COLORS.skill;
-							case "channel":
-								return NODE_COLORS.channel;
-							default:
-								return NODE_COLORS.default;
-						}
-					}}
-				/>
 			</ReactFlow>
 
 			<ContextMenu />

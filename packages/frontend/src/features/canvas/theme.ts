@@ -1,3 +1,5 @@
+import type { GroupKind } from "./types";
+
 // Domain-to-token mapping.
 // Maps domain node types to the semantic categorical accent scale.
 // React Flow handles/edges require resolved hex values — these are
@@ -8,6 +10,7 @@ export const NODE_COLORS = {
 	tool: "#c08040", // accent-2
 	skill: "#c0a050", // accent-3
 	channel: "#6b6058", // accent-4
+	group: "#4a4542",
 	default: "#4a4542",
 } as const;
 
@@ -18,4 +21,12 @@ export const NODE_TOKENS = {
 	tool: "accent-2",
 	skill: "accent-3",
 	channel: "accent-4",
+	group: "muted",
 } as const;
+
+// Maps group kind to the color of its children
+export const GROUP_KIND_COLORS: Record<GroupKind, string> = {
+	tools: NODE_COLORS.tool,
+	skills: NODE_COLORS.skill,
+	channels: NODE_COLORS.channel,
+};

@@ -15,12 +15,24 @@ import { createDefaultSkill } from "../skill/defaults";
 import type { AgentSkill } from "../skill/types";
 import { createDefaultTool } from "../tool/defaults";
 import type { AgentTool } from "../tool/types";
-import { computeAutoLayout, countChildrenByType, getChildPosition } from "./layout";
+import { computeAutoLayout, getChildPosition, getGroupPosition, groupNodeId } from "./layout";
 import { loadLayout, saveLayout } from "./persistence";
-import { NODE_COLORS } from "./theme";
-import type { AgentFlowEdge, AgentFlowNode } from "./types";
+import { GROUP_KIND_COLORS } from "./theme";
+import type { AgentFlowEdge, AgentFlowNode, GroupKind } from "./types";
 
-type PanelType = "agent" | "tool" | "skill" | "channel" | null;
+type PanelType = "agent" | "group" | "tool" | "skill" | "channel" | null;
+
+const GROUP_KINDS: GroupKind[] = ["tools", "skills", "channels"];
+const GROUP_LABELS: Record<GroupKind, string> = {
+	tools: "Tools",
+	skills: "Skills",
+	channels: "Channels",
+};
+
+// Map child node type to group kind
+function childTypeToKind(childType: "tool" | "skill" | "channel"): GroupKind {
+	return childType === "tool" ? "tools" : childType === "skill" ? "skills" : "channels";
+}
 
 interface FlowState {
 	nodes: AgentFlowNode[];
@@ -52,17 +64,14 @@ interface FlowState {
 
 	loadFromApi: () => Promise<void>;
 
-	// Context menu
 	contextMenu: { x: number; y: number; nodeId: string | null; nodeType: string | null } | null;
 	openContextMenu: (x: number, y: number, nodeId: string | null, nodeType: string | null) => void;
 	closeContextMenu: () => void;
 
-	// Auto layout
 	autoLayout: () => void;
 
-	// Collapse/expand
-	collapsedGroups: Record<string, Array<"tools" | "skills" | "channels">>;
-	toggleCollapse: (agentId: string, group: "tools" | "skills" | "channels") => void;
+	collapsedGroups: Record<string, Partial<Record<GroupKind, boolean>>>;
+	toggleCollapse: (agentId: string, group: GroupKind) => void;
 }
 
 // Helper: get the Agent object from a node
@@ -80,6 +89,38 @@ function syncAgent(nodes: AgentFlowNode[], agentId: string) {
 	}
 }
 
+// Helper: build group nodes + agent→group edges for one agent
+function buildGroupNodesForAgent(
+	agentId: string,
+	agentPos: { x: number; y: number },
+	positions: Record<string, { x: number; y: number }>,
+): { nodes: AgentFlowNode[]; edges: AgentFlowEdge[] } {
+	const gNodes: AgentFlowNode[] = [];
+	const gEdges: AgentFlowEdge[] = [];
+
+	for (const kind of GROUP_KINDS) {
+		const gId = groupNodeId(agentId, kind);
+		const pos = positions[gId] ?? getGroupPosition(agentPos.x, agentPos.y, kind);
+
+		gNodes.push({
+			id: gId,
+			type: "group",
+			position: pos,
+			data: { label: GROUP_LABELS[kind], agentId, kind },
+		} as AgentFlowNode);
+
+		gEdges.push({
+			id: `${agentId}-${gId}`,
+			source: agentId,
+			target: gId,
+			sourceHandle: kind,
+			style: { stroke: GROUP_KIND_COLORS[kind], strokeWidth: 2 },
+		});
+	}
+
+	return { nodes: gNodes, edges: gEdges };
+}
+
 let persistTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const useFlowStore = create<FlowState>((set, get) => {
@@ -95,50 +136,42 @@ export const useFlowStore = create<FlowState>((set, get) => {
 		}, 300);
 	};
 
+	// Add a child node under its group node
 	const addChildNode = (
 		agentId: string,
 		childType: "tool" | "skill" | "channel",
 		nodeData: AgentFlowNode["data"],
 	): string => {
-		const { nodes } = get();
-		const agentNode = nodes.find((n) => n.id === agentId);
-		if (!agentNode) return "";
+		const { nodes, edges, collapsedGroups } = get();
+		const kind = childTypeToKind(childType);
+		const gId = groupNodeId(agentId, kind);
+		const groupNode = nodes.find((n) => n.id === gId);
+		if (!groupNode) return "";
 
-		const childCount = countChildrenByType(nodes, agentId, childType);
-		const position = getChildPosition(
-			agentNode.position.x,
-			agentNode.position.y,
-			childType,
-			childCount,
-		);
+		// Count existing children of this group
+		const childCount = edges.filter((e) => e.source === gId).length;
+		const position = getChildPosition(groupNode.position.x, groupNode.position.y, childCount);
 
 		const nodeId = generateId();
-		const handleId = childType === "tool" ? "tools" : childType === "skill" ? "skills" : "channels";
+		const isCollapsed = collapsedGroups[agentId]?.[kind] ?? false;
 
 		const newNode: AgentFlowNode = {
 			id: nodeId,
 			type: childType,
 			position,
 			data: nodeData,
+			hidden: isCollapsed,
 		} as AgentFlowNode;
 
 		const newEdge: AgentFlowEdge = {
-			id: `${agentId}-${nodeId}`,
-			source: agentId,
+			id: `${gId}-${nodeId}`,
+			source: gId,
 			target: nodeId,
-			sourceHandle: handleId,
-			style: {
-				stroke:
-					childType === "tool"
-						? NODE_COLORS.tool
-						: childType === "skill"
-							? NODE_COLORS.skill
-							: NODE_COLORS.channel,
-				strokeWidth: 2,
-			},
+			style: { stroke: GROUP_KIND_COLORS[kind], strokeWidth: 2 },
+			hidden: isCollapsed,
 		};
 
-		set({ nodes: [...nodes, newNode], edges: [...get().edges, newEdge] });
+		set({ nodes: [...nodes, newNode], edges: [...edges, newEdge] });
 		persistLayout();
 		return nodeId;
 	};
@@ -171,24 +204,20 @@ export const useFlowStore = create<FlowState>((set, get) => {
 
 		toggleCollapse: (agentId, group) => {
 			const { nodes, edges, collapsedGroups } = get();
-			const current = collapsedGroups[agentId] ?? [];
-			const isCollapsed = current.includes(group);
-			const next = isCollapsed ? current.filter((g) => g !== group) : [...current, group];
+			const current = collapsedGroups[agentId] ?? {};
+			const isCollapsed = current[group] ?? false;
+			const next = { ...current, [group]: !isCollapsed };
 
-			// Find child node IDs for this group via edges
-			const handleId = group; // "tools" | "skills" | "channels"
-			const childNodeIds = new Set(
-				edges
-					.filter((e) => e.source === agentId && e.sourceHandle === handleId)
-					.map((e) => e.target),
-			);
+			// Find child nodes via group→child edges
+			const gId = groupNodeId(agentId, group);
+			const childNodeIds = new Set(edges.filter((e) => e.source === gId).map((e) => e.target));
 
-			const hidden = !isCollapsed; // toggling: if was expanded, now hide
+			const hidden = !isCollapsed; // toggling
 
 			set({
 				nodes: nodes.map((n) => (childNodeIds.has(n.id) ? { ...n, hidden } : n)) as AgentFlowNode[],
 				edges: edges.map((e) =>
-					childNodeIds.has(e.target) && e.source === agentId ? { ...e, hidden } : e,
+					e.source === gId && childNodeIds.has(e.target) ? { ...e, hidden } : e,
 				),
 				collapsedGroups: { ...collapsedGroups, [agentId]: next },
 			});
@@ -214,83 +243,96 @@ export const useFlowStore = create<FlowState>((set, get) => {
 			const layout = loadLayout();
 			const positions = layout?.positions ?? {};
 
-			const nodes: AgentFlowNode[] = [];
-			const edges: AgentFlowEdge[] = [];
+			const allNodes: AgentFlowNode[] = [];
+			const allEdges: AgentFlowEdge[] = [];
 			let yOffset = 0;
 
 			for (const agent of agents) {
 				const agentPos = positions[agent.id] ?? { x: 250, y: yOffset };
 				yOffset += 400;
 
-				nodes.push({
+				// Agent node
+				allNodes.push({
 					id: agent.id,
 					type: "agent",
 					position: agentPos,
 					data: { label: agent.name, agent },
 				});
 
-				// Rebuild child nodes for tools
+				// Group nodes + agent→group edges
+				const groups = buildGroupNodesForAgent(agent.id, agentPos, positions);
+				allNodes.push(...groups.nodes);
+				allEdges.push(...groups.edges);
+
+				// Child nodes for tools
+				const toolsGroupId = groupNodeId(agent.id, "tools");
+				const toolsGroupPos =
+					positions[toolsGroupId] ?? getGroupPosition(agentPos.x, agentPos.y, "tools");
 				for (let i = 0; i < agent.tools.length; i++) {
 					const tool = agent.tools[i];
 					const nodeId = `tool-${tool.id}`;
-					const pos = positions[nodeId] ?? getChildPosition(agentPos.x, agentPos.y, "tool", i);
-					nodes.push({
+					const pos = positions[nodeId] ?? getChildPosition(toolsGroupPos.x, toolsGroupPos.y, i);
+					allNodes.push({
 						id: nodeId,
 						type: "tool",
 						position: pos,
 						data: { label: tool.name, tool, agentId: agent.id },
 					} as AgentFlowNode);
-					edges.push({
-						id: `${agent.id}-${nodeId}`,
-						source: agent.id,
+					allEdges.push({
+						id: `${toolsGroupId}-${nodeId}`,
+						source: toolsGroupId,
 						target: nodeId,
-						sourceHandle: "tools",
-						style: { stroke: NODE_COLORS.tool, strokeWidth: 2 },
+						style: { stroke: GROUP_KIND_COLORS.tools, strokeWidth: 2 },
 					});
 				}
 
-				// Rebuild child nodes for skills
+				// Child nodes for skills
+				const skillsGroupId = groupNodeId(agent.id, "skills");
+				const skillsGroupPos =
+					positions[skillsGroupId] ?? getGroupPosition(agentPos.x, agentPos.y, "skills");
 				for (let i = 0; i < agent.skills.length; i++) {
 					const skill = agent.skills[i];
 					const nodeId = `skill-${skill.id}`;
-					const pos = positions[nodeId] ?? getChildPosition(agentPos.x, agentPos.y, "skill", i);
-					nodes.push({
+					const pos = positions[nodeId] ?? getChildPosition(skillsGroupPos.x, skillsGroupPos.y, i);
+					allNodes.push({
 						id: nodeId,
 						type: "skill",
 						position: pos,
 						data: { label: skill.name, skill, agentId: agent.id },
 					} as AgentFlowNode);
-					edges.push({
-						id: `${agent.id}-${nodeId}`,
-						source: agent.id,
+					allEdges.push({
+						id: `${skillsGroupId}-${nodeId}`,
+						source: skillsGroupId,
 						target: nodeId,
-						sourceHandle: "skills",
-						style: { stroke: NODE_COLORS.skill, strokeWidth: 2 },
+						style: { stroke: GROUP_KIND_COLORS.skills, strokeWidth: 2 },
 					});
 				}
 
-				// Rebuild child nodes for channels
+				// Child nodes for channels
+				const channelsGroupId = groupNodeId(agent.id, "channels");
+				const channelsGroupPos =
+					positions[channelsGroupId] ?? getGroupPosition(agentPos.x, agentPos.y, "channels");
 				for (let i = 0; i < agent.channels.length; i++) {
 					const channel = agent.channels[i];
 					const nodeId = `channel-${channel.id}`;
-					const pos = positions[nodeId] ?? getChildPosition(agentPos.x, agentPos.y, "channel", i);
-					nodes.push({
+					const pos =
+						positions[nodeId] ?? getChildPosition(channelsGroupPos.x, channelsGroupPos.y, i);
+					allNodes.push({
 						id: nodeId,
 						type: "channel",
 						position: pos,
 						data: { label: channel.name, channel, agentId: agent.id },
 					} as AgentFlowNode);
-					edges.push({
-						id: `${agent.id}-${nodeId}`,
-						source: agent.id,
+					allEdges.push({
+						id: `${channelsGroupId}-${nodeId}`,
+						source: channelsGroupId,
 						target: nodeId,
-						sourceHandle: "channels",
-						style: { stroke: NODE_COLORS.channel, strokeWidth: 2 },
+						style: { stroke: GROUP_KIND_COLORS.channels, strokeWidth: 2 },
 					});
 				}
 			}
 
-			set({ nodes, edges });
+			set({ nodes: allNodes, edges: allEdges });
 			persistLayout();
 		},
 
@@ -299,7 +341,6 @@ export const useFlowStore = create<FlowState>((set, get) => {
 			const channel = createDefaultChannel();
 			draft.channels = [channel];
 
-			// Create on backend first to get real ID
 			const { id: _ignore, ...body } = draft;
 			const agent = await api.agents.create(body as Omit<Agent, "id">);
 
@@ -310,11 +351,17 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				data: { label: agent.name, agent },
 			};
 
-			set({ nodes: [...get().nodes, agentNode] });
+			const currentNodes = get().nodes;
+			const currentEdges = get().edges;
 
-			// Add default channel node
+			// Build group nodes
+			const groups = buildGroupNodesForAgent(agent.id, position, {});
+
+			// Build default channel child node
+			const channelsGroupId = groupNodeId(agent.id, "channels");
+			const channelsGroupPos = getGroupPosition(position.x, position.y, "channels");
 			const chNodeId = `channel-${agent.channels[0].id}`;
-			const chPos = getChildPosition(position.x, position.y, "channel", 0);
+			const chPos = getChildPosition(channelsGroupPos.x, channelsGroupPos.y, 0);
 			const chNode: AgentFlowNode = {
 				id: chNodeId,
 				type: "channel",
@@ -322,16 +369,15 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				data: { label: agent.channels[0].name, channel: agent.channels[0], agentId: agent.id },
 			} as AgentFlowNode;
 			const chEdge: AgentFlowEdge = {
-				id: `${agent.id}-${chNodeId}`,
-				source: agent.id,
+				id: `${channelsGroupId}-${chNodeId}`,
+				source: channelsGroupId,
 				target: chNodeId,
-				sourceHandle: "channels",
-				style: { stroke: NODE_COLORS.channel, strokeWidth: 2 },
+				style: { stroke: GROUP_KIND_COLORS.channels, strokeWidth: 2 },
 			};
 
 			set({
-				nodes: [...get().nodes, chNode],
-				edges: [...get().edges, chEdge],
+				nodes: [...currentNodes, agentNode, ...groups.nodes, chNode],
+				edges: [...currentEdges, ...groups.edges, chEdge],
 				selectedNodeId: agent.id,
 				panelType: "agent",
 			});
@@ -359,14 +405,15 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				}) as AgentFlowNode[],
 			});
 			persistLayout();
-			// Sync to backend
 			syncAgent(get().nodes, id);
 		},
 
 		deleteAgent: (id) => {
 			const { nodes, edges } = get();
-			const childNodeIds = edges.filter((e) => e.source === id).map((e) => e.target);
-			const idsToRemove = new Set([id, ...childNodeIds]);
+			// Cascade: agent → groups → children
+			const groupIds = GROUP_KINDS.map((k) => groupNodeId(id, k));
+			const childNodeIds = edges.filter((e) => groupIds.includes(e.source)).map((e) => e.target);
+			const idsToRemove = new Set([id, ...groupIds, ...childNodeIds]);
 
 			set({
 				nodes: nodes.filter((n) => !idsToRemove.has(n.id)) as AgentFlowNode[],

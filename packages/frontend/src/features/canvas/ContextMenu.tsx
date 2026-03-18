@@ -1,4 +1,6 @@
 import {
+	ChevronDown,
+	ChevronRight,
 	LayoutGrid,
 	Maximize,
 	MessageCircle,
@@ -12,6 +14,7 @@ import {
 import { useEffect, useRef } from "react";
 import { useChatStore } from "../channel/store";
 import { useFlowStore } from "./store";
+import type { GroupNodeData } from "./types";
 
 interface MenuItem {
 	label: string;
@@ -33,6 +36,8 @@ export function ContextMenu() {
 		deleteTool,
 		deleteSkill,
 		deleteChannel,
+		toggleCollapse,
+		collapsedGroups,
 	} = useFlowStore();
 	const { openChat } = useChatStore();
 	const ref = useRef<HTMLDivElement>(null);
@@ -102,6 +107,29 @@ export function ContextMenu() {
 			},
 			variant: "destructive",
 		});
+	} else if (nodeId && nodeType === "group") {
+		const node = nodes.find((n) => n.id === nodeId);
+		if (node?.type === "group") {
+			const groupData = node.data as GroupNodeData;
+			const isCollapsed = collapsedGroups[groupData.agentId]?.[groupData.kind] ?? false;
+
+			items.push({
+				label: "Open Panel",
+				icon: <Pencil size={14} />,
+				action: () => {
+					setSelectedNode(nodeId, "group");
+					closeContextMenu();
+				},
+			});
+			items.push({
+				label: isCollapsed ? "Expand" : "Collapse",
+				icon: isCollapsed ? <ChevronDown size={14} /> : <ChevronRight size={14} />,
+				action: () => {
+					toggleCollapse(groupData.agentId, groupData.kind);
+					closeContextMenu();
+				},
+			});
+		}
 	} else if (nodeId && nodeType === "tool") {
 		const node = nodes.find((n) => n.id === nodeId);
 		const agentId =
@@ -216,6 +244,7 @@ export function ContextMenu() {
 		>
 			{items.map((item, i) => (
 				<button
+					type="button"
 					key={i}
 					onClick={item.action}
 					className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-accent ${

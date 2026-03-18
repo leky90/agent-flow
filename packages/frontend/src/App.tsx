@@ -8,9 +8,11 @@ import type { Agent } from "./features/agent/types";
 import { Canvas } from "./features/canvas/Canvas";
 import { Sidebar } from "./features/canvas/Sidebar";
 import { useFlowStore } from "./features/canvas/store";
+import type { GroupNodeData } from "./features/canvas/types";
 import { ChannelPanel } from "./features/channel/ChannelPanel";
 import { ChatThread } from "./features/channel/ChatThread";
 import type { AgentChannel } from "./features/channel/types";
+import { GroupPanel } from "./features/group/GroupPanel";
 import { SkillPanel } from "./features/skill/SkillPanel";
 import type { AgentSkill } from "./features/skill/types";
 import { ToolPanel } from "./features/tool/ToolPanel";
@@ -20,6 +22,7 @@ import { ThemeToggle } from "./shared/ui/ThemeToggle";
 
 const PANEL_TITLES: Record<string, string> = {
 	agent: "Edit Agent",
+	group: "Group",
 	tool: "Edit Tool",
 	skill: "Edit Skill",
 	channel: "Edit Channel",
@@ -42,6 +45,10 @@ function AppContent() {
 		switch (panelType) {
 			case "agent":
 				return <AgentPanel agent={(selectedNode.data as { agent: Agent }).agent} />;
+			case "group": {
+				const groupData = selectedNode.data as GroupNodeData;
+				return <GroupPanel agentId={groupData.agentId} kind={groupData.kind} />;
+			}
 			case "tool":
 				return (
 					<ToolPanel
@@ -68,6 +75,11 @@ function AppContent() {
 		}
 	};
 
+	const panelTitle =
+		panelType === "group" && selectedNode
+			? `${(selectedNode.data as GroupNodeData).label}`
+			: (PANEL_TITLES[panelType ?? ""] ?? "");
+
 	return (
 		<div className="relative h-screen w-screen bg-background">
 			<Canvas />
@@ -75,9 +87,7 @@ function AppContent() {
 			{panelType && (
 				<div className="absolute top-0 right-0 flex h-full w-80 flex-col border-l-[0.5px] border-border bg-card">
 					<div className="flex items-center justify-between border-b border-border px-4 py-3">
-						<h2 className="font-heading text-sm font-semibold tracking-wide">
-							{PANEL_TITLES[panelType]}
-						</h2>
+						<h2 className="font-heading text-sm font-semibold tracking-wide">{panelTitle}</h2>
 						<Button variant="ghost" size="icon-xs" onClick={closePanel}>
 							<X size={14} />
 						</Button>

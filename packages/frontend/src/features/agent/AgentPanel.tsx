@@ -1,5 +1,3 @@
-import { MessageSquare, Plus, Wrench, Zap } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,7 +8,6 @@ import {
 	SelectTrigger,
 	SelectValue,
 } from "@/components/ui/select";
-import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import { useFlowStore } from "../canvas/store";
 import type { Agent, ThinkingLevel, ToolExecution } from "./types";
@@ -20,7 +17,7 @@ interface AgentPanelProps {
 }
 
 export function AgentPanel({ agent }: AgentPanelProps) {
-	const { updateAgent, addTool, addSkill, addChannel } = useFlowStore();
+	const { updateAgent } = useFlowStore();
 
 	return (
 		<ScrollArea className="h-full">
@@ -89,44 +86,6 @@ export function AgentPanel({ agent }: AgentPanelProps) {
 							<SelectItem value="sequential">Sequential</SelectItem>
 						</SelectContent>
 					</Select>
-				</div>
-
-				<Separator />
-
-				<div className="space-y-2">
-					<Label className="font-heading tracking-widest uppercase">Add Children</Label>
-					<div className="flex flex-col gap-1.5">
-						<Button
-							variant="outline"
-							size="sm"
-							className="justify-start"
-							onClick={() => addTool(agent.id)}
-						>
-							<Wrench size={14} />
-							<Plus size={14} />
-							Add Tool
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							className="justify-start"
-							onClick={() => addSkill(agent.id)}
-						>
-							<Zap size={14} />
-							<Plus size={14} />
-							Add Skill
-						</Button>
-						<Button
-							variant="outline"
-							size="sm"
-							className="justify-start"
-							onClick={() => addChannel(agent.id)}
-						>
-							<MessageSquare size={14} />
-							<Plus size={14} />
-							Add Channel
-						</Button>
-					</div>
 				</div>
 			</div>
 		</ScrollArea>
