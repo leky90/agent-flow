@@ -208,17 +208,22 @@ export const useFlowStore = create<FlowState>((set, get) => {
 			const isCollapsed = current[group] ?? false;
 			const next = { ...current, [group]: !isCollapsed };
 
-			// Find child nodes via group→child edges
+			// Hide/show: group node + agent→group edge + child nodes + group→child edges
 			const gId = groupNodeId(agentId, group);
 			const childNodeIds = new Set(edges.filter((e) => e.source === gId).map((e) => e.target));
+			const allHiddenIds = new Set([gId, ...childNodeIds]);
 
 			const hidden = !isCollapsed; // toggling
 
 			set({
-				nodes: nodes.map((n) => (childNodeIds.has(n.id) ? { ...n, hidden } : n)) as AgentFlowNode[],
-				edges: edges.map((e) =>
-					e.source === gId && childNodeIds.has(e.target) ? { ...e, hidden } : e,
-				),
+				nodes: nodes.map((n) => (allHiddenIds.has(n.id) ? { ...n, hidden } : n)) as AgentFlowNode[],
+				edges: edges.map((e) => {
+					// Hide agent→group edge
+					if (e.target === gId && e.source === agentId) return { ...e, hidden };
+					// Hide group→child edges
+					if (e.source === gId && childNodeIds.has(e.target)) return { ...e, hidden };
+					return e;
+				}),
 				collapsedGroups: { ...collapsedGroups, [agentId]: next },
 			});
 			persistLayout();
