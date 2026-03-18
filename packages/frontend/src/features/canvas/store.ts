@@ -166,7 +166,12 @@ export const useFlowStore = create<FlowState>((set, get) => {
 
 		// Count existing children of this group
 		const childCount = edges.filter((e) => e.source === gId).length;
-		const position = getChildPosition(groupNode.position.x, groupNode.position.y, childCount);
+		const position = getChildPosition(
+			groupNode.position.x,
+			groupNode.position.y,
+			childCount,
+			childCount + 1,
+		);
 
 		const nodeId = generateId();
 		const isCollapsed = collapsedGroups[agentId]?.[kind] ?? false;
@@ -335,7 +340,9 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				for (let i = 0; i < agent.tools.length; i++) {
 					const tool = agent.tools[i];
 					const nodeId = `tool-${tool.id}`;
-					const pos = positions[nodeId] ?? getChildPosition(toolsGroupPos.x, toolsGroupPos.y, i);
+					const pos =
+						positions[nodeId] ??
+						getChildPosition(toolsGroupPos.x, toolsGroupPos.y, i, agent.tools.length);
 					allNodes.push({
 						id: nodeId,
 						type: "tool",
@@ -356,7 +363,9 @@ export const useFlowStore = create<FlowState>((set, get) => {
 				for (let i = 0; i < agent.skills.length; i++) {
 					const skill = agent.skills[i];
 					const nodeId = `skill-${skill.id}`;
-					const pos = positions[nodeId] ?? getChildPosition(skillsGroupPos.x, skillsGroupPos.y, i);
+					const pos =
+						positions[nodeId] ??
+						getChildPosition(skillsGroupPos.x, skillsGroupPos.y, i, agent.skills.length);
 					allNodes.push({
 						id: nodeId,
 						type: "skill",
@@ -378,7 +387,8 @@ export const useFlowStore = create<FlowState>((set, get) => {
 					const channel = agent.channels[i];
 					const nodeId = `channel-${channel.id}`;
 					const pos =
-						positions[nodeId] ?? getChildPosition(channelsGroupPos.x, channelsGroupPos.y, i);
+						positions[nodeId] ??
+						getChildPosition(channelsGroupPos.x, channelsGroupPos.y, i, agent.channels.length);
 					allNodes.push({
 						id: nodeId,
 						type: "channel",
@@ -443,7 +453,7 @@ export const useFlowStore = create<FlowState>((set, get) => {
 			const channelsGroupId = groupNodeId(agent.id, "channels");
 			const channelsGroupPos = getGroupPosition(position.x, position.y, "channels");
 			const chNodeId = `channel-${agent.channels[0].id}`;
-			const chPos = getChildPosition(channelsGroupPos.x, channelsGroupPos.y, 0);
+			const chPos = getChildPosition(channelsGroupPos.x, channelsGroupPos.y, 0, 1);
 			const chNode: AgentFlowNode = {
 				id: chNodeId,
 				type: "channel",

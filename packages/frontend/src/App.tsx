@@ -1,5 +1,5 @@
 import { ReactFlowProvider } from "@xyflow/react";
-import { Bot, HelpCircle, X } from "lucide-react";
+import { Bot, HelpCircle, LayoutGrid, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -29,7 +29,8 @@ const PANEL_TITLES: Record<string, string> = {
 };
 
 function AppContent() {
-	const { nodes, selectedNodeId, panelType, loadFromApi, closePanel } = useFlowStore();
+	const { nodes, selectedNodeId, panelType, loadFromApi, closePanel, addAgent, autoLayout } =
+		useFlowStore();
 	const [sidebarOpen, setSidebarOpen] = useState(false);
 	const tour = useOnboardingTour();
 
@@ -101,18 +102,51 @@ function AppContent() {
 
 			<OnboardingTour active={tour.active} onFinish={tour.finish} />
 
-			<div className="fixed top-4 right-4 z-50 flex items-center gap-2">
-				<Button variant="ghost" size="icon" aria-label="Show tutorial" onClick={tour.start}>
-					<HelpCircle size={16} />
-				</Button>
-				<ThemeToggle />
+			{/* FAB toolbar — left center */}
+			<div className="fixed left-4 top-1/2 z-50 flex -translate-y-1/2 flex-col gap-2">
 				<Button
-					size="icon-lg"
+					size="icon"
+					variant={sidebarOpen ? "default" : "outline"}
 					aria-label="Toggle agent list"
+					title="Agent List"
 					onClick={() => setSidebarOpen((v) => !v)}
 				>
-					<Bot size={20} />
+					<Bot size={18} />
 				</Button>
+
+				<Button
+					size="icon"
+					variant="outline"
+					aria-label="Add agent"
+					title="Add Agent"
+					onClick={() => addAgent()}
+				>
+					<Plus size={18} />
+				</Button>
+
+				<Button
+					size="icon"
+					variant="outline"
+					aria-label="Auto layout"
+					title="Auto Layout"
+					onClick={() => autoLayout()}
+				>
+					<LayoutGrid size={18} />
+				</Button>
+
+				<div className="my-1 h-px w-full bg-border" />
+
+				<Button
+					size="icon"
+					variant="ghost"
+					aria-label="Show tutorial"
+					title="Tutorial"
+					onClick={tour.start}
+				>
+					<HelpCircle size={16} />
+				</Button>
+
+				<ThemeToggle />
 			</div>
 		</div>
 	);
