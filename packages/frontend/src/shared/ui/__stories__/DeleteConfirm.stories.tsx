@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "@storybook/test";
 import { DeleteConfirm } from "../DeleteConfirm";
 
 const meta = {
@@ -8,8 +7,8 @@ const meta = {
 	args: {
 		title: "Delete Agent?",
 		message: "This will delete the agent and all its tools, skills, and channels.",
-		onConfirm: fn(),
-		onCancel: fn(),
+		onConfirm: () => {},
+		onCancel: () => {},
 	},
 } satisfies Meta<typeof DeleteConfirm>;
 

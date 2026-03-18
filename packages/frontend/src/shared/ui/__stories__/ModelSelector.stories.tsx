@@ -1,5 +1,4 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { fn } from "@storybook/test";
 import { ModelSelector } from "../ModelSelector";
 
 const meta = {
@@ -8,8 +7,8 @@ const meta = {
 	args: {
 		provider: "anthropic",
 		model: "claude-sonnet-4-20250514",
-		onProviderChange: fn(),
-		onModelChange: fn(),
+		onProviderChange: () => {},
+		onModelChange: () => {},
 	},
 } satisfies Meta<typeof ModelSelector>;
 
