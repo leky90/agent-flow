@@ -230,7 +230,51 @@ export const useFlowStore = create<FlowState>((set, get) => {
 		},
 
 		onNodesChange: (changes) => {
-			set({ nodes: applyNodeChanges(changes, get().nodes) as AgentFlowNode[] });
+			const { nodes, edges } = get();
+
+			// Detect agent node position changes and move descendants together
+			const agentDelta = new Map<string, { dx: number; dy: number }>();
+			for (const change of changes) {
+				if (change.type === "position" && change.position) {
+					const node = nodes.find((n) => n.id === change.id);
+					if (node?.type === "agent") {
+						agentDelta.set(change.id, {
+							dx: change.position.x - node.position.x,
+							dy: change.position.y - node.position.y,
+						});
+					}
+				}
+			}
+
+			let updated = applyNodeChanges(changes, nodes) as AgentFlowNode[];
+
+			// Move group nodes + child nodes along with their agent
+			if (agentDelta.size > 0) {
+				// Build map: agentId → set of descendant node IDs (groups + children)
+				const descendants = new Map<string, Set<string>>();
+				for (const [agentId] of agentDelta) {
+					const groupIds = GROUP_KINDS.map((k) => groupNodeId(agentId, k));
+					const childIds = edges.filter((e) => groupIds.includes(e.source)).map((e) => e.target);
+					descendants.set(agentId, new Set([...groupIds, ...childIds]));
+				}
+
+				updated = updated.map((n) => {
+					for (const [agentId, delta] of agentDelta) {
+						if (descendants.get(agentId)?.has(n.id)) {
+							return {
+								...n,
+								position: {
+									x: n.position.x + delta.dx,
+									y: n.position.y + delta.dy,
+								},
+							};
+						}
+					}
+					return n;
+				}) as AgentFlowNode[];
+			}
+
+			set({ nodes: updated });
 			persistLayout();
 		},
 
