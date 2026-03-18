@@ -39,7 +39,10 @@ export async function createApp() {
 		});
 	});
 
-	await app.register(cors, { origin: true });
+	await app.register(cors, {
+		origin: true,
+		methods: ["GET", "HEAD", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+	});
 
 	// Wire dependencies
 	const providers = [
