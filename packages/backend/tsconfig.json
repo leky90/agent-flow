@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "paths": {
+      "@agent-flow/shared": ["../shared/src/index.ts"]
+    }
+  },
+  "include": ["src"]
+}

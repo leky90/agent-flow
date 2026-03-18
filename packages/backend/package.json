@@ -1,0 +1,29 @@
+{
+  "name": "@agent-flow/backend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@agent-flow/shared": "workspace:*",
+    "@fastify/cors": "^11.0.0",
+    "@mariozechner/pi-agent-core": "^0.60.0",
+    "@mariozechner/pi-ai": "^0.60.0",
+    "@mariozechner/pi-coding-agent": "^0.60.0",
+    "better-sqlite3": "^12.8.0",
+    "fastify": "^5.3.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13",
+    "@types/node": "^25.5.0",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3",
+    "vitest": "^4.1.0"
+  }
+}
