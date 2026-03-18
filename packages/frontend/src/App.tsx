@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AgentPanel } from "./features/agent/AgentPanel";
 import type { Agent } from "./features/agent/types";
@@ -184,17 +185,16 @@ function AppContent() {
 		<div className="relative h-screen w-screen bg-background">
 			<Canvas />
 
-			{panelType && (
-				<div className="absolute top-0 right-0 flex h-full w-80 flex-col border-l-[0.5px] border-border bg-card">
-					<div className="flex items-center justify-between border-b border-border px-4 py-3">
-						<h2 className="font-heading text-sm font-semibold tracking-wide">{panelTitle}</h2>
-						<Button variant="ghost" size="icon-xs" onClick={closePanel}>
-							<X size={14} />
-						</Button>
-					</div>
+			<Sheet open={!!panelType} onOpenChange={(open) => !open && closePanel()}>
+				<SheetContent side="right" showCloseButton className="w-80 p-0">
+					<SheetHeader className="border-b border-border px-4 py-3">
+						<SheetTitle className="font-heading text-sm font-semibold tracking-wide">
+							{panelTitle}
+						</SheetTitle>
+					</SheetHeader>
 					<div className="flex-1 overflow-hidden">{renderPanel()}</div>
-				</div>
-			)}
+				</SheetContent>
+			</Sheet>
 
 			<ChatThread />
 
